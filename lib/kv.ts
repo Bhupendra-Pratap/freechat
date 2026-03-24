@@ -4,26 +4,16 @@ let _kv: Redis | null = null;
 
 function getKV(): Redis {
   if (!_kv) {
-    // Vercel/Upstash integration can inject under several different names
     const url =
       process.env.KV_REST_API_URL ||
       process.env.UPSTASH_REDIS_REST_URL ||
       process.env.KV_URL;
-
     const token =
       process.env.KV_REST_API_TOKEN ||
       process.env.UPSTASH_REDIS_REST_TOKEN;
-
-    // Debug — visible in Vercel function logs
-    console.log('[kv] url set:', !!url, '| token set:', !!token);
-    console.log('[kv] available env keys:', Object.keys(process.env).filter(k =>
-      k.includes('KV') || k.includes('REDIS') || k.includes('UPSTASH')
-    ));
-
     if (!url || !token) {
       throw new Error(`[kv] Missing Redis credentials. url=${url ?? 'MISSING'}, token=${token ? '***' : 'MISSING'}`);
     }
-
     _kv = new Redis({ url, token });
   }
   return _kv;
@@ -65,12 +55,16 @@ export async function deleteSession(token: string): Promise<void> {
   await getKV().del(`session:${token}`);
 }
 
-export async function getMessages(limit = 120): Promise<Message[]> {
-  const raw = await getKV().lrange<Message>('messages', 0, limit - 1);
+// ── Messages — scoped per department ─────────────────────────────────────────
+
+export async function getMessages(department: string, limit = 120): Promise<Message[]> {
+  const key = `messages:${department}`;
+  const raw = await getKV().lrange<Message>(key, 0, limit - 1);
   return [...raw].reverse();
 }
 
 export async function addMessage(msg: Message): Promise<void> {
-  await getKV().lpush('messages', msg);
-  await getKV().ltrim('messages', 0, 499);
+  const key = `messages:${msg.department}`;
+  await getKV().lpush(key, msg);
+  await getKV().ltrim(key, 0, 499);
 }

@@ -9,8 +9,10 @@ async function authenticate(req: NextRequest): Promise<string | null> {
   return getSession(token);
 }
 
-export async function GET() {
-  const messages = await getMessages(120);
+export async function GET(req: NextRequest) {
+  const dept = req.nextUrl.searchParams.get('dept');
+  if (!dept) return NextResponse.json({ error: 'dept param required' }, { status: 400 });
+  const messages = await getMessages(dept, 120);
   return NextResponse.json(messages);
 }
 

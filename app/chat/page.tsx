@@ -10,6 +10,14 @@ interface Message {
   timestamp: number;
 }
 
+const DEPT_LABELS: Record<string, string> = {
+  CS:'Computer Science', EE:'Electrical Engg.', ME:'Mechanical Engg.',
+  CE:'Civil Engg.', MBA:'Business & MBA', BIO:'Biotechnology',
+  CHEM:'Chemistry', MATH:'Mathematics', PHY:'Physics',
+  LAW:'Law', MED:'Medical / MBBS', ARTS:'Arts & Humanities',
+  ECON:'Economics', ARCH:'Architecture', OTHER:'Other',
+};
+
 const DEPT_COLORS: Record<string, string> = {
   CS:'#4fc3f7', EE:'#ffd740', ME:'#ff8a65', CE:'#a5d6a7',
   MBA:'#ce93d8', BIO:'#80cbc4', CHEM:'#ef9a9a', MATH:'#fff176',
@@ -18,8 +26,7 @@ const DEPT_COLORS: Record<string, string> = {
 };
 
 function fmtTime(ts: number) {
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function DotOnline() {
@@ -45,7 +52,6 @@ export default function ChatPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const prevCountRef = useRef(0);
 
-  // auth guard
   useEffect(() => {
     const t = sessionStorage.getItem('fcc_token');
     const n = sessionStorage.getItem('fcc_nick');
@@ -54,25 +60,22 @@ export default function ChatPage() {
     setToken(t); setNick(n); setDept(d);
   }, [router]);
 
-  // fetch messages
   const fetchMessages = useCallback(async () => {
+    if (!dept) return;
     try {
-      const res = await fetch('/api/messages');
+      const res = await fetch(`/api/messages?dept=${dept}`);
       if (!res.ok) return;
-      const data: Message[] = await res.json();
-      setMessages(data);
+      setMessages(await res.json());
     } catch { /* ignore */ }
-  }, []);
+  }, [dept]);
 
-  // initial fetch + poll every 3s
   useEffect(() => {
-    if (!token) return;
+    if (!token || !dept) return;
     fetchMessages();
     const id = setInterval(fetchMessages, 3000);
     return () => clearInterval(id);
-  }, [token, fetchMessages]);
+  }, [token, dept, fetchMessages]);
 
-  // scroll to bottom on new messages
   useEffect(() => {
     if (messages.length !== prevCountRef.current) {
       prevCountRef.current = messages.length;
@@ -87,7 +90,6 @@ export default function ChatPage() {
     const text = input.trim();
     setInput('');
 
-    // optimistic
     const optimistic: Message = {
       id: `opt-${Date.now()}`, nickname: nick, department: dept, text, timestamp: Date.now(),
     };
@@ -104,7 +106,7 @@ export default function ChatPage() {
         setError(d.error ?? 'Failed to send.'); setInput(text);
         setMessages(prev => prev.filter(m => m.id !== optimistic.id));
       } else {
-        await fetchMessages(); // sync with server
+        await fetchMessages();
       }
     } catch {
       setError('Network error.'); setInput(text);
@@ -119,12 +121,11 @@ export default function ChatPage() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e as unknown as FormEvent); }
   }
 
-  function logout() {
-    sessionStorage.clear();
-    router.push('/');
-  }
+  function logout() { sessionStorage.clear(); router.push('/'); }
+  function changeDept() { router.push('/department'); }
 
   const deptColor = DEPT_COLORS[dept] ?? '#9e9e9e';
+  const deptLabel = DEPT_LABELS[dept] ?? dept;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)' }}>
@@ -136,19 +137,21 @@ export default function ChatPage() {
         background: 'var(--surface)', borderBottom: '1px solid var(--border)',
         boxShadow: '0 1px 12px rgba(0,0,0,0.4)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontFamily: 'var(--font-head)', fontSize: '1.6rem', color: 'var(--accent)', letterSpacing: '0.04em' }}>
             FreeChatCU
           </span>
+          {/* Department badge */}
           <span style={{
-            padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem',
-            background: 'rgba(245,197,24,0.12)', color: 'var(--accent)', fontFamily: 'var(--font-mono)',
+            padding: '3px 10px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 700,
+            background: `${deptColor}20`, color: deptColor,
+            border: `1px solid ${deptColor}50`,
           }}>
-            LIVE
+            # {deptLabel}
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--muted)' }}>
             <DotOnline /> {online} online
           </span>
@@ -157,24 +160,17 @@ export default function ChatPage() {
             padding: '4px 10px', borderRadius: '20px',
             background: 'var(--surface2)', border: '1px solid var(--border)',
           }}>
-            <span style={{
-              width: 8, height: 8, borderRadius: '50%', background: deptColor, flexShrink: 0,
-            }} />
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: deptColor, flexShrink: 0 }} />
             <span style={{ fontSize: '0.8rem', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
               @{nick}
             </span>
-            <span style={{
-              fontSize: '0.7rem', padding: '1px 6px', borderRadius: '3px',
-              background: `${deptColor}22`, color: deptColor, fontWeight: 600,
-            }}>
-              {dept}
-            </span>
           </div>
-          <button
-            onClick={logout}
-            className="btn btn-ghost"
-            style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
-          >
+          <button onClick={changeDept} className="btn btn-ghost"
+            style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
+            ⇄ Dept
+          </button>
+          <button onClick={logout} className="btn btn-ghost"
+            style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
             Leave
           </button>
         </div>
@@ -187,31 +183,28 @@ export default function ChatPage() {
       }}>
         {messages.length === 0 && (
           <div style={{
-            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--muted)', gap: '8px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem',
+            flex: 1, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            color: 'var(--muted)', gap: '8px',
+            fontFamily: 'var(--font-mono)', fontSize: '0.85rem',
           }}>
             <span style={{ fontSize: '2rem' }}>💬</span>
-            <span>No messages yet. Break the silence.</span>
+            <span>No messages yet in <strong style={{ color: deptColor }}>#{dept}</strong>. Be the first.</span>
           </div>
         )}
 
         {messages.map((msg, idx) => {
           const isMe = msg.nickname === nick;
           const color = DEPT_COLORS[msg.department] ?? '#9e9e9e';
-          const prevMsg = messages[idx - 1];
-          const sameSender = prevMsg?.nickname === msg.nickname;
-          const gap = sameSender ? '0' : '0.6rem';
+          const sameSender = messages[idx - 1]?.nickname === msg.nickname;
 
           return (
-            <div
-              key={msg.id}
-              style={{
-                marginTop: gap,
-                display: 'flex', flexDirection: 'column',
-                alignItems: isMe ? 'flex-end' : 'flex-start',
-                animation: 'bubblePop 0.2s ease both',
-              }}
-            >
+            <div key={msg.id} style={{
+              marginTop: sameSender ? '0' : '0.6rem',
+              display: 'flex', flexDirection: 'column',
+              alignItems: isMe ? 'flex-end' : 'flex-start',
+              animation: 'bubblePop 0.2s ease both',
+            }}>
               {!sameSender && (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
@@ -220,12 +213,6 @@ export default function ChatPage() {
                 }}>
                   <span style={{ fontSize: '0.78rem', fontFamily: 'var(--font-mono)', color, fontWeight: 700 }}>
                     @{msg.nickname}
-                  </span>
-                  <span style={{
-                    fontSize: '0.68rem', padding: '1px 5px', borderRadius: '3px',
-                    background: `${color}20`, color, fontWeight: 600,
-                  }}>
-                    {msg.department}
                   </span>
                   <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
                     {fmtTime(msg.timestamp)}
@@ -238,8 +225,7 @@ export default function ChatPage() {
                 border: `1px solid ${isMe ? 'rgba(245,197,24,0.25)' : 'var(--border)'}`,
                 borderRadius: isMe ? '12px 2px 12px 12px' : '2px 12px 12px 12px',
                 fontSize: '0.9rem', lineHeight: 1.55,
-                fontFamily: 'var(--font-body)', wordBreak: 'break-word',
-                color: 'var(--text)',
+                wordBreak: 'break-word', color: 'var(--text)',
               }}>
                 {msg.text}
               </div>
@@ -259,9 +245,7 @@ export default function ChatPage() {
             marginBottom: '0.5rem', padding: '0.4rem 0.8rem', borderRadius: 'var(--radius)',
             background: 'rgba(224,82,82,0.1)', border: '1px solid rgba(224,82,82,0.3)',
             color: 'var(--danger)', fontSize: '0.8rem',
-          }}>
-            ⚠ {error}
-          </div>
+          }}>⚠ {error}</div>
         )}
         <form onSubmit={send} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-end' }}>
           <textarea
@@ -270,24 +254,18 @@ export default function ChatPage() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
+            placeholder={`Message #${deptLabel}… (Enter to send)`}
             rows={1}
-            style={{
-              flex: 1, resize: 'none', lineHeight: 1.5, maxHeight: '120px',
-              fontFamily: 'var(--font-body)',
-            }}
+            style={{ flex: 1, resize: 'none', lineHeight: 1.5, maxHeight: '120px' }}
           />
-          <button
-            className="btn btn-primary"
-            type="submit"
+          <button className="btn btn-primary" type="submit"
             disabled={sending || !input.trim()}
-            style={{ flexShrink: 0, height: '42px', padding: '0 1.2rem' }}
-          >
+            style={{ flexShrink: 0, height: '42px', padding: '0 1.2rem' }}>
             {sending ? '…' : '↑ Send'}
           </button>
         </form>
         <p style={{ fontSize: '0.72rem', color: 'var(--muted)', marginTop: '0.4rem' }}>
-          Chatting as <strong style={{ color: deptColor }}>@{nick}</strong> from <strong style={{ color: deptColor }}>{dept}</strong> · All messages are anonymous nicknames only
+          Chatting as <strong style={{ color: deptColor }}>@{nick}</strong> in <strong style={{ color: deptColor }}>#{deptLabel}</strong> · Switch departments anytime with ⇄ Dept
         </p>
       </div>
     </div>
