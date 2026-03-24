@@ -1,6 +1,6 @@
 import { kv } from '@vercel/kv';
 
-export interface User {
+export interface User extends Record<string, unknown> {
   nickname: string;
   passwordHash: string;
   createdAt: number;
