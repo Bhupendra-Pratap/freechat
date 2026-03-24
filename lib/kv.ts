@@ -1,9 +1,33 @@
 import { Redis } from '@upstash/redis';
 
-const kv = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-});
+let _kv: Redis | null = null;
+
+function getKV(): Redis {
+  if (!_kv) {
+    // Vercel/Upstash integration can inject under several different names
+    const url =
+      process.env.KV_REST_API_URL ||
+      process.env.UPSTASH_REDIS_REST_URL ||
+      process.env.KV_URL;
+
+    const token =
+      process.env.KV_REST_API_TOKEN ||
+      process.env.UPSTASH_REDIS_REST_TOKEN;
+
+    // Debug — visible in Vercel function logs
+    console.log('[kv] url set:', !!url, '| token set:', !!token);
+    console.log('[kv] available env keys:', Object.keys(process.env).filter(k =>
+      k.includes('KV') || k.includes('REDIS') || k.includes('UPSTASH')
+    ));
+
+    if (!url || !token) {
+      throw new Error(`[kv] Missing Redis credentials. url=${url ?? 'MISSING'}, token=${token ? '***' : 'MISSING'}`);
+    }
+
+    _kv = new Redis({ url, token });
+  }
+  return _kv;
+}
 
 export interface User {
   nickname: string;
@@ -19,43 +43,34 @@ export interface Message {
   timestamp: number;
 }
 
-// ── Users ────────────────────────────────────────────────────────────────────
-
 export async function getUser(nickname: string): Promise<User | null> {
-  const key = `user:${nickname.toLowerCase()}`;
-  const data = await kv.hgetall(key);
+  const data = await getKV().hgetall(`user:${nickname.toLowerCase()}`);
   if (!data || Object.keys(data).length === 0) return null;
   return data as unknown as User;
 }
 
 export async function createUser(user: User): Promise<void> {
-  const key = `user:${user.nickname.toLowerCase()}`;
-  await kv.hset(key, user as unknown as Record<string, unknown>);
+  await getKV().hset(`user:${user.nickname.toLowerCase()}`, user as unknown as Record<string, unknown>);
 }
 
-// ── Sessions ─────────────────────────────────────────────────────────────────
-
 export async function createSession(token: string, nickname: string): Promise<void> {
-  await kv.set(`session:${token}`, nickname, { ex: 60 * 60 * 24 * 7 }); // 7 days
+  await getKV().set(`session:${token}`, nickname, { ex: 60 * 60 * 24 * 7 });
 }
 
 export async function getSession(token: string): Promise<string | null> {
-  return await kv.get<string>(`session:${token}`);
+  return await getKV().get<string>(`session:${token}`);
 }
 
 export async function deleteSession(token: string): Promise<void> {
-  await kv.del(`session:${token}`);
+  await getKV().del(`session:${token}`);
 }
 
-// ── Messages ─────────────────────────────────────────────────────────────────
-
 export async function getMessages(limit = 120): Promise<Message[]> {
-  const raw = await kv.lrange<Message>('messages', 0, limit - 1);
-  // Stored newest-first; reverse for display (oldest→newest)
+  const raw = await getKV().lrange<Message>('messages', 0, limit - 1);
   return [...raw].reverse();
 }
 
 export async function addMessage(msg: Message): Promise<void> {
-  await kv.lpush('messages', msg);
-  await kv.ltrim('messages', 0, 499); // cap at 500
+  await getKV().lpush('messages', msg);
+  await getKV().ltrim('messages', 0, 499);
 }
