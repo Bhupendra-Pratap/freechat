@@ -1,6 +1,11 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 
-export interface User extends Record<string, unknown> {
+const kv = new Redis({
+  url: process.env.KV_REST_API_URL!,
+  token: process.env.KV_REST_API_TOKEN!,
+});
+
+export interface User {
   nickname: string;
   passwordHash: string;
   createdAt: number;
@@ -18,12 +23,14 @@ export interface Message {
 
 export async function getUser(nickname: string): Promise<User | null> {
   const key = `user:${nickname.toLowerCase()}`;
-  return await kv.hgetall<User>(key);
+  const data = await kv.hgetall(key);
+  if (!data || Object.keys(data).length === 0) return null;
+  return data as unknown as User;
 }
 
 export async function createUser(user: User): Promise<void> {
   const key = `user:${user.nickname.toLowerCase()}`;
-  await kv.hset(key, user);
+  await kv.hset(key, user as unknown as Record<string, unknown>);
 }
 
 // ── Sessions ─────────────────────────────────────────────────────────────────
@@ -40,7 +47,7 @@ export async function deleteSession(token: string): Promise<void> {
   await kv.del(`session:${token}`);
 }
 
-// ── Messages ──────────────────────────────────────────────────────────────────
+// ── Messages ─────────────────────────────────────────────────────────────────
 
 export async function getMessages(limit = 120): Promise<Message[]> {
   const raw = await kv.lrange<Message>('messages', 0, limit - 1);
