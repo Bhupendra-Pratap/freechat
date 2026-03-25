@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { getMessages, addMessage, getSession } from '@/lib/kv';
+import { getMessages, addMessage, getSession, pruneOldMessages } from '@/lib/kv';
 
 async function authenticate(req: NextRequest): Promise<string | null> {
   const auth = req.headers.get('authorization') ?? '';
@@ -12,6 +12,8 @@ async function authenticate(req: NextRequest): Promise<string | null> {
 export async function GET(req: NextRequest) {
   const dept = req.nextUrl.searchParams.get('dept');
   if (!dept) return NextResponse.json({ error: 'dept param required' }, { status: 400 });
+  // Prune old messages on every fetch (lightweight — filters in memory)
+  await pruneOldMessages(dept);
   const messages = await getMessages(dept, 120);
   return NextResponse.json(messages);
 }

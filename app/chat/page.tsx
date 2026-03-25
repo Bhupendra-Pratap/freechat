@@ -29,15 +29,6 @@ function fmtTime(ts: number) {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function DotOnline() {
-  return (
-    <span style={{
-      display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-      background: 'var(--success)', animation: 'pulse-dot 2s infinite',
-    }} />
-  );
-}
-
 export default function ChatPage() {
   const router = useRouter();
   const [nick, setNick] = useState('');
@@ -89,12 +80,10 @@ export default function ChatPage() {
     setSending(true); setError('');
     const text = input.trim();
     setInput('');
-
     const optimistic: Message = {
       id: `opt-${Date.now()}`, nickname: nick, department: dept, text, timestamp: Date.now(),
     };
     setMessages(prev => [...prev, optimistic]);
-
     try {
       const res = await fetch('/api/messages', {
         method: 'POST',
@@ -105,16 +94,11 @@ export default function ChatPage() {
         const d = await res.json();
         setError(d.error ?? 'Failed to send.'); setInput(text);
         setMessages(prev => prev.filter(m => m.id !== optimistic.id));
-      } else {
-        await fetchMessages();
-      }
+      } else { await fetchMessages(); }
     } catch {
       setError('Network error.'); setInput(text);
       setMessages(prev => prev.filter(m => m.id !== optimistic.id));
-    } finally {
-      setSending(false);
-      inputRef.current?.focus();
-    }
+    } finally { setSending(false); inputRef.current?.focus(); }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -128,146 +112,211 @@ export default function ChatPage() {
   const deptLabel = DEPT_LABELS[dept] ?? dept;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)' }}>
+    <>
+      {/* Responsive styles injected globally */}
+      <style>{`
+        html, body { overflow: hidden; }
+        .chat-wrap { display: flex; flex-direction: column; height: 100dvh; height: 100vh; background: var(--bg); overflow: hidden; }
 
-      {/* ── HEADER ── */}
-      <header style={{
-        flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 1.25rem', height: '56px',
-        background: 'var(--surface)', borderBottom: '1px solid var(--border)',
-        boxShadow: '0 1px 12px rgba(0,0,0,0.4)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontFamily: 'var(--font-head)', fontSize: '1.6rem', color: 'var(--accent)', letterSpacing: '0.04em' }}>
-            FreeChatCU
-          </span>
-          {/* Department badge */}
-          <span style={{
-            padding: '3px 10px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 700,
-            background: `${deptColor}20`, color: deptColor,
-            border: `1px solid ${deptColor}50`,
-          }}>
-            # {deptLabel}
-          </span>
-        </div>
+        /* ── Header ── */
+        .chat-header {
+          flex-shrink: 0;
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 0 14px; height: 52px; gap: 8px;
+          background: var(--surface); border-bottom: 1px solid var(--border);
+          box-shadow: 0 1px 12px rgba(0,0,0,0.4);
+          min-width: 0; overflow: hidden;
+        }
+        .chat-header-left {
+          display: flex; align-items: center; gap: 8px;
+          min-width: 0; overflow: hidden; flex: 1;
+        }
+        .chat-logo {
+          font-family: var(--font-head); font-size: 1.5rem;
+          color: var(--accent); letter-spacing: 0.04em;
+          white-space: nowrap; flex-shrink: 0;
+        }
+        .dept-badge {
+          padding: 3px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 700;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          max-width: 130px; flex-shrink: 1;
+        }
+        .chat-header-right {
+          display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+        }
+        .online-pill {
+          display: flex; align-items: center; gap: 4px;
+          font-size: 0.75rem; color: var(--muted); white-space: nowrap;
+        }
+        .online-dot {
+          display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+          background: var(--success); animation: pulse-dot 2s infinite; flex-shrink: 0;
+        }
+        .nick-pill {
+          display: flex; align-items: center; gap: 6px;
+          padding: 3px 8px; border-radius: 20px;
+          background: var(--surface2); border: 1px solid var(--border);
+          font-size: 0.78rem; color: var(--text); font-family: var(--font-mono);
+          white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis;
+        }
+        .nick-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .btn-sm {
+          padding: 5px 10px; border-radius: var(--radius);
+          font-size: 0.76rem; font-weight: 600; cursor: pointer;
+          border: 1px solid var(--border); background: transparent;
+          color: var(--muted); transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
+        }
+        .btn-sm:hover { color: var(--text); border-color: var(--muted); }
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--muted)' }}>
-            <DotOnline /> {online} online
-          </span>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '4px 10px', borderRadius: '20px',
-            background: 'var(--surface2)', border: '1px solid var(--border)',
-          }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: deptColor, flexShrink: 0 }} />
-            <span style={{ fontSize: '0.8rem', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
-              @{nick}
+        /* hide online count on very small screens */
+        @media (max-width: 380px) {
+          .online-pill { display: none; }
+          .dept-badge { max-width: 90px; }
+          .nick-pill { max-width: 80px; }
+          .chat-logo { font-size: 1.25rem; }
+        }
+
+        /* ── Messages ── */
+        .chat-messages {
+          flex: 1; overflow-y: auto; padding: 12px 14px;
+          display: flex; flex-direction: column; gap: 2px;
+        }
+        .chat-empty {
+          flex: 1; display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          color: var(--muted); gap: 8px;
+          font-family: var(--font-mono); font-size: 0.85rem; text-align: center;
+        }
+        .msg-row { display: flex; flex-direction: column; }
+        .msg-meta {
+          display: flex; align-items: center; gap: 6px; margin-bottom: 3px;
+        }
+        .msg-meta-me { flex-direction: row-reverse; }
+        .msg-bubble {
+          max-width: min(72%, 340px); padding: 8px 12px;
+          font-size: 0.9rem; line-height: 1.55;
+          word-break: break-word; color: var(--text);
+        }
+
+        /* ── Input ── */
+        .chat-input-wrap {
+          flex-shrink: 0; padding: 10px 14px 14px;
+          background: var(--surface); border-top: 1px solid var(--border);
+        }
+        .chat-input-row {
+          display: flex; gap: 8px; align-items: flex-end;
+        }
+        .chat-textarea {
+          flex: 1; resize: none; line-height: 1.5; max-height: 100px;
+          min-height: 40px; font-family: var(--font-body);
+        }
+        .chat-send-btn {
+          flex-shrink: 0; height: 40px; padding: 0 14px;
+          font-size: 0.88rem;
+        }
+        .chat-footer-note {
+          font-size: 0.7rem; color: var(--muted); margin-top: 6px;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+      `}</style>
+
+      <div className="chat-wrap">
+
+        {/* ── HEADER ── */}
+        <header className="chat-header">
+          <div className="chat-header-left">
+            <span className="chat-logo">FCC</span>
+            <span className="dept-badge" style={{
+              background: `${deptColor}20`, color: deptColor,
+              border: `1px solid ${deptColor}50`,
+            }}>
+              # {deptLabel}
             </span>
           </div>
-          <button onClick={changeDept} className="btn btn-ghost"
-            style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
-            ⇄ Dept
-          </button>
-          <button onClick={logout} className="btn btn-ghost"
-            style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
-            Leave
-          </button>
-        </div>
-      </header>
 
-      {/* ── MESSAGES ── */}
-      <div style={{
-        flex: 1, overflowY: 'auto', padding: '1rem 1.25rem',
-        display: 'flex', flexDirection: 'column', gap: '2px',
-      }}>
-        {messages.length === 0 && (
-          <div style={{
-            flex: 1, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            color: 'var(--muted)', gap: '8px',
-            fontFamily: 'var(--font-mono)', fontSize: '0.85rem',
-          }}>
-            <span style={{ fontSize: '2rem' }}>💬</span>
-            <span>No messages yet in <strong style={{ color: deptColor }}>#{dept}</strong>. Be the first.</span>
+          <div className="chat-header-right">
+            <span className="online-pill">
+              <span className="online-dot" />
+              {online}
+            </span>
+            <span className="nick-pill">
+              <span className="nick-dot" style={{ background: deptColor }} />
+              @{nick}
+            </span>
+            <button className="btn-sm" onClick={changeDept} title="Switch department">⇄</button>
+            <button className="btn-sm" onClick={logout} title="Leave">✕</button>
           </div>
-        )}
+        </header>
 
-        {messages.map((msg, idx) => {
-          const isMe = msg.nickname === nick;
-          const color = DEPT_COLORS[msg.department] ?? '#9e9e9e';
-          const sameSender = messages[idx - 1]?.nickname === msg.nickname;
-
-          return (
-            <div key={msg.id} style={{
-              marginTop: sameSender ? '0' : '0.6rem',
-              display: 'flex', flexDirection: 'column',
-              alignItems: isMe ? 'flex-end' : 'flex-start',
-              animation: 'bubblePop 0.2s ease both',
-            }}>
-              {!sameSender && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  marginBottom: '3px',
-                  flexDirection: isMe ? 'row-reverse' : 'row',
-                }}>
-                  <span style={{ fontSize: '0.78rem', fontFamily: 'var(--font-mono)', color, fontWeight: 700 }}>
-                    @{msg.nickname}
-                  </span>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
-                    {fmtTime(msg.timestamp)}
-                  </span>
-                </div>
-              )}
-              <div style={{
-                maxWidth: '72%', padding: '0.55rem 0.9rem',
-                background: isMe ? 'rgba(245,197,24,0.13)' : 'var(--surface2)',
-                border: `1px solid ${isMe ? 'rgba(245,197,24,0.25)' : 'var(--border)'}`,
-                borderRadius: isMe ? '12px 2px 12px 12px' : '2px 12px 12px 12px',
-                fontSize: '0.9rem', lineHeight: 1.55,
-                wordBreak: 'break-word', color: 'var(--text)',
-              }}>
-                {msg.text}
-              </div>
+        {/* ── MESSAGES ── */}
+        <div className="chat-messages">
+          {messages.length === 0 && (
+            <div className="chat-empty">
+              <span style={{ fontSize: '2rem' }}>💬</span>
+              <span>No messages yet in <strong style={{ color: deptColor }}>#{dept}</strong>.<br />Be the first.</span>
             </div>
-          );
-        })}
-        <div ref={bottomRef} />
-      </div>
+          )}
 
-      {/* ── INPUT ── */}
-      <div style={{
-        flexShrink: 0, padding: '0.9rem 1.25rem',
-        background: 'var(--surface)', borderTop: '1px solid var(--border)',
-      }}>
-        {error && (
-          <div style={{
-            marginBottom: '0.5rem', padding: '0.4rem 0.8rem', borderRadius: 'var(--radius)',
-            background: 'rgba(224,82,82,0.1)', border: '1px solid rgba(224,82,82,0.3)',
-            color: 'var(--danger)', fontSize: '0.8rem',
-          }}>⚠ {error}</div>
-        )}
-        <form onSubmit={send} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-end' }}>
-          <textarea
-            ref={inputRef}
-            className="input"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={`Message #${deptLabel}… (Enter to send)`}
-            rows={1}
-            style={{ flex: 1, resize: 'none', lineHeight: 1.5, maxHeight: '120px' }}
-          />
-          <button className="btn btn-primary" type="submit"
-            disabled={sending || !input.trim()}
-            style={{ flexShrink: 0, height: '42px', padding: '0 1.2rem' }}>
-            {sending ? '…' : '↑ Send'}
-          </button>
-        </form>
-        <p style={{ fontSize: '0.72rem', color: 'var(--muted)', marginTop: '0.4rem' }}>
-          Chatting as <strong style={{ color: deptColor }}>@{nick}</strong> in <strong style={{ color: deptColor }}>#{deptLabel}</strong> · Switch departments anytime with ⇄ Dept
-        </p>
+          {messages.map((msg, idx) => {
+            const isMe = msg.nickname === nick;
+            const color = DEPT_COLORS[msg.department] ?? '#9e9e9e';
+            const sameSender = messages[idx - 1]?.nickname === msg.nickname;
+
+            return (
+              <div key={msg.id} className="msg-row" style={{
+                marginTop: sameSender ? 0 : '0.6rem',
+                alignItems: isMe ? 'flex-end' : 'flex-start',
+                animation: 'bubblePop 0.2s ease both',
+              }}>
+                {!sameSender && (
+                  <div className={`msg-meta${isMe ? ' msg-meta-me' : ''}`}>
+                    <span style={{ fontSize: '0.78rem', fontFamily: 'var(--font-mono)', color, fontWeight: 700 }}>
+                      @{msg.nickname}
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>{fmtTime(msg.timestamp)}</span>
+                  </div>
+                )}
+                <div className="msg-bubble" style={{
+                  background: isMe ? 'rgba(245,197,24,0.13)' : 'var(--surface2)',
+                  border: `1px solid ${isMe ? 'rgba(245,197,24,0.25)' : 'var(--border)'}`,
+                  borderRadius: isMe ? '12px 2px 12px 12px' : '2px 12px 12px 12px',
+                }}>
+                  {msg.text}
+                </div>
+              </div>
+            );
+          })}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* ── INPUT ── */}
+        <div className="chat-input-wrap">
+          {error && (
+            <div style={{
+              marginBottom: '6px', padding: '6px 10px', borderRadius: 'var(--radius)',
+              background: 'rgba(224,82,82,0.1)', border: '1px solid rgba(224,82,82,0.3)',
+              color: 'var(--danger)', fontSize: '0.8rem',
+            }}>⚠ {error}</div>
+          )}
+          <form onSubmit={send} className="chat-input-row">
+            <textarea
+              ref={inputRef}
+              className="input chat-textarea"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={`Message #${dept}…`}
+              rows={1}
+            />
+            <button className="btn btn-primary chat-send-btn" type="submit" disabled={sending || !input.trim()}>
+              {sending ? '…' : '↑'}
+            </button>
+          </form>
+          <p className="chat-footer-note">
+            @{nick} · #{deptLabel} · Switch dept: ⇄ &nbsp;|&nbsp; Leave: ✕
+          </p>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
